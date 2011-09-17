@@ -1,0 +1,36 @@
+===
+
+To flush all data:
+
+./flush.sh
+
+===
+
+To run everything from a clean boot:
+
+Set firewall rules:
+sudo ./newset.sh
+
+Run the post 80 transparent proxy / redirection service:
+python redirect_server.py
+
+Run the content server for serving cached HTTP:
+python content_server.py
+
+Run the main system to handle user requests:
+sudo twistd --logfile=http_server.log --pidfile=http_server.pid -ny http_server.py
+
+(sudo required for port 80 hosting)
+
+===
+
+To manually edit saved objects:
+
+python manage.py shell
+>>> from handle.models import Request
+>>> r = Request.objects.all()
+>>> r[0].whatever # first result in set
+>>> r[0].save(using='host') # or 'courier'
+>>> r[0].delete(using='host') # same deal
+
+===
