@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{bc887c33-4205-4890-889e-f9b0fade780e}</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>
+    </StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <AssemblyName>CANDICE</AssemblyName>
+    <Name>CANDICE</Name>
+    <RootNamespace>CANDICE</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="candice_types\__init__.py" />
+    <Compile Include="ext_proxy.old.py" />
+    <Compile Include="ext_proxy.py" />
+    <Compile Include="handle\models.py" />
+    <Compile Include="handle\tests.py" />
+    <Compile Include="handle\views.py" />
+    <Compile Include="handle\__init__.py" />
+    <Compile Include="int_proxy.old.py" />
+    <Compile Include="int_proxy.py" />
+    <Compile Include="manage.py" />
+    <Compile Include="settings.py" />
+    <Compile Include="urls.py" />
+    <Compile Include="__init__.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="handle\" />
+    <Folder Include="candice_types" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="django.wsgi" />
+    <Content Include="external.cfg" />
+  </ItemGroup>
+</Project>
