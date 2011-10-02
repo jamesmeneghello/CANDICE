@@ -4,12 +4,11 @@ from twisted.application import internet, service
 from twisted.internet import reactor
 import os, sys
 
-# Config
-INTERFACE = "10.2.2.1"
-#Runtime config, is there a cleaner way?:
-STATIC_PORT = 80
-sys.path.append('/home/james/ict617')
-os.environ['DJANGO_SETTINGS_MODULE'] = 'candice.settings'
+execfile('internal_config.py')
+
+# set up django environment variables
+sys.path.append('/home/james/ict617/candice')
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
 from django.core.handlers.wsgi import WSGIHandler
 
 class RootResource(resource.Resource):
@@ -40,4 +39,4 @@ serviceCollection = service.IServiceCollection(application)
 root_resource = get_root_resource()
 root_resource.putChild("static", static.File("static"))
 http_factory = server.Site(root_resource)
-internet.TCPServer(STATIC_PORT, http_factory).setServiceParent(serviceCollection)
+internet.TCPServer(web_server_port, http_factory).setServiceParent(serviceCollection)

@@ -1,18 +1,31 @@
 import subprocess
 import shutil, os, sys
 import urlparse, glob, urllib
-import tldextract
 import distutils.dir_util
+import dbus, gobject
+import datetime
+from itertools import chain
+from dbus.mainloop.glib import DBusGMainLoop
+from django.conf import settings
+#from candice_types.request import request_types
+#from candice_types.storage import storage_types
 
-class URL(object):
+class URL():
     def __init__(self, url):
         self.url = url
+        
+        # add http if it doesn't exist
+        self.fixurl()
+
+        # auto-parse the url, because we're unlikely to ever not want it parsed
         self.parse()
     
     def __str__(self):
         return unicode(self).encode('utf-8')
 
     def fixurl(self):
+        # irritatingly, urlparse treats urls not starting with a protocol
+        # as relative paths, so we add it manually
         if self.url.find('http://') == -1:
             self.url = 'http://' + self.url
 
@@ -23,17 +36,24 @@ class URL(object):
                 pass
 
     def with_www(self):
+        # manually add a www, as some sites require it and others don't,
+        # but it's safer to force it. however, this means some sites
+        # don't get hit properly - lack of config standards strikes again
         if self.host.find('www') == -1:
             host = 'www.' + self.host
         else:
             host = self.host
+
+        # rebuild the url and return it without mutating this object
         return urlparse.urlunsplit([self.proto, host, self.uri, self.query, self.fragment])
 
-    def tld(self):
-        return tldextract.extract(self.url)['domain']
-
+    
+    # no longer necessary but might be useful in the future
+    #def tld(self):
+    #    return tldextract.extract(self.url)['domain']
+        
     def parse(self):
-        self.fixurl()
+        # split it into component parts
         parts = urlparse.urlparse(self.url)
         self.proto = parts[0]
         self.host = parts[1]
@@ -43,73 +63,135 @@ class URL(object):
         self.fixuri()
 
     def inject_query(self, data):
+        # join querystring vars together
         qs = '&'.join([k+'='+urllib.quote(str(v)) for (k,v) in data.items()])
         self.query = qs
 
     def __unicode__(self):
+        # crush it back into a url
         return urlparse.urlunsplit([self.proto, self.host, self.uri, self.query, self.fragment])
 
 ######################################################
 
-class ProxyBase(object):
-    def __init__(self, requests, host_path, courier_path):
-        self.requests = requests
-        self.host_path = host_path
-        self.courier_path = courier_path
+class ProxyBase():
+    def __init__(self):
+        self.requests = []
+        self.courier_path = ''
+        self.host_path = ''
+        self.databases = {}
+        self.default_db = ''
+        DBusGMainLoop(set_as_default=True)
+        self.bus = dbus.SystemBus()
+
+    def device_added(self, device):
+        # build udisk connection for this device
+        dev_obj = self.bus.get_object('org.freedesktop.UDisks', device)
+        dev_props = dbus.Interface(dev_obj, dbus.PROPERTIES_IFACE)
+        
+        # grab the mount point of the inserted device
+        courier_path = dev_props.Get('org.freedesktop.UDisks.Device', 'DeviceMountPaths')
+
+        for path in courier_path:
+            print ('Device: ' + path)
+            # if the drive is "formatted" as a courier disk
+            if os.path.exists(os.path.join(path, 'Courier.db')):
+                print('Compatible device found!')
+
+                # we found a courier, so set the path and start the setup
+                self.courier_path = path
+                self.begin()
+
+    def database(self):
+        engine = 'django.db.backends.sqlite3'
+        
+        # if there's a courier drive inserted
+        if self.courier_path:
+            # set up the database and add it to the db config
+            courier_database = {
+                'ENGINE':engine,
+                'NAME':os.path.join(self.courier_path, 'Courier.db')
+            }
+            self.databases.update({'courier':courier_database})
+
+        # same deal for a host drive
+        if self.host_path:
+            host_database = {
+                'ENGINE':engine,
+                'NAME':os.path.join(self.host_path, 'CANDICE.db')
+            }
+            self.databases.update({'host':host_database})
+        
+        # if the proxy's constructor hasn't set which default db to use,
+        # sperg out
+        if not self.default_db:
+            print('Missing default database parameter in proxy!')
+            sys.exit()
+        
+        # leave it up to the implementation to choose a default
+        self.databases.update({'default':self.databases[self.default_db].copy()})
+        
+        # update django db conf forcefully (the devs would hate this :D)
+        settings.DATABASES = self.databases
+
+    def start(self):
+        # set up overall dbus connection
+        proxy = self.bus.get_object('org.freedesktop.UDisks', '/org/freedesktop/UDisks')
+        iface = dbus.Interface(proxy, 'org.freedesktop.UDisks')
+
+        # register callback on device_added
+        iface.connect_to_signal('DeviceAdded', self.device_added)
+
+        # start the dbus checking loop
+        mainloop = gobject.MainLoop()
+        mainloop.run()
+
+    def get_requests(self):
+        from handle.models import Request
+        c_req = []
+        h_req = []
+        if self.courier_path:
+            c_req = Request.objects.using('courier').all()
+        if self.host_path:
+            h_req = Request.objects.using('host').all()
+
+        # join either/both host and courier into a single list
+        self.requests = list(chain(c_req, h_req))
 
     def begin(self):
+        self.database()
+        self.get_requests()
         for request in self.requests:
+            print('Processing request %s...' % request)
             self.setup(request)
             self.process(request)
-            self.finalise(request)
+            print('Request completed.')
+        print('Completed for now, moving back to wait mode...')
 
     def setup(self, request):
-            request.request_handler = request_types[request.request_type](request)
+            request.request_handler = request_types[request.request_type](self, request)
             request.host_store = storage_types[request.storage_type](request, self.host_path)
             request.courier_store = storage_types[request.storage_type](request, self.courier_path)
 
     def process(self, request):
         raise NotImplementedError('No proxy process code!')
 
-    def finalise(self, request):
-        raise NotImplementedError('No proxy finalise code!')
+    def incoming(self, request):
+        if request.courier_store.exists():
+            request.host_store.store(request.courier_store.get_path())
+            request.courier_store.flush()
+        
+    def outgoing(self, request):
+        if request.host_store.exists():
+            request.courier_store.store(request.host_store.get_path())
 
 ############
 
-class ExternalProxy(ProxyBase):
-    def __init__(self, requests, host_path, courier_path):
-        super(ExternalProxy, self).__init__(requests, host_path, courier_path)
-
-    def process(self, request):
-        print('Processing proxy...')
-        request.request_handler.external_action()
-
-    def finalise(self, request):
-        print('Finalising request...')
-        request.request_handler.post_external()
-
-############
-
-class InternalProxy(ProxyBase):
-    def __init__(self, requests, host_path, courier_path):
-        super(InternalProxy, self).__init__(requests, host_path, courier_path)
-
-    def process(self, request):
-        print('Processing proxy...')
-        request.request_handler.internal_action()
-
-    def finalise(self, request):
-        print('Finalising request...')
-        request.request_handler.post_internal()
-
-######################################################
-
-class StorageBase(object):
+class StorageBase():
     def __init__(self, request, storage_path):
         self.request = request
         self.storage_path = storage_path
 
-    def store(self, src_dir):
+    def store(self, src):
         raise NotImplementedError('No function to store!')
 
     def flush(self):
@@ -121,103 +203,14 @@ class StorageBase(object):
     def get_base_path(self):
         return self.storage_path
 
+    def exists(self):
+        raise NotImplementedError('No exists function!')
+
 ##################
 
-class UrlStorage(StorageBase):
-    def store(self, data):
-        if data:
-            print('Storing data...')
-            distutils.dir_util.copy_tree(data, self.get_path())
-    
-    def flush(self):
-        print('Removing data...')
-        distutils.dir_util.remove_tree(self.get_path())
-
-    def get_path(self):
-        return os.path.join(self.storage_path, 'data', self.request.url.with_www().replace('http://',''))
-
-    def get_base_path(self):
-        return os.path.join(self.storage_path, 'data')
-
-######################################################
-
-class RequestBase(object):
-    def __init__(self, request):
+class RequestBase():
+    def __init__(self, proxy, request):
+        self.proxy = proxy
         self.request = request
 
-    def internal_action(self):
-        raise NotImplementedError('No internal action!')
-
-    def external_action(self):
-        raise NotImplementedError('No external action!')
-
-    def post_internal(self):
-        pass
-    
-    def post_external(self):
-        pass
-
 ##################
-
-class HttpRequest(RequestBase):
-    def __init__(self, request):
-        super(HttpRequest, self).__init__(request)
-        self.request.url = URL(request.target)
-
-    def internal_action(self):
-        print('Executing internal action')
-        if self.request.flag == 'retrieved':
-            self.request.host_store.store(self.request.courier_store.get_path())
-            self.request.courier_store.flush()
-            self.request.flag = 'completed'
-        elif self.request.flag == 'error':
-            pass
-        elif self.request.flag == 'requested':
-            pass
-
-    def external_action(self):
-        print('Executing external action...')
-        if self.request.flag == 'requested':
-            if self.request.action == 'mirror':
-                self.mirror()
-        
-            if os.path.exists(self.request.host_store.get_path()):
-                self.request.courier_store.store(self.request.host_store.get_path())
-                self.request.flag = 'retrieved'
-            else:
-                self.request.flag = 'error'
-
-    def post_internal(self):
-        if self.request.flag == 'completed':
-            self.request.save(using='host')
-            self.request.delete(using='courier')
-        elif self.request.flag == 'requested':
-            self.request.save(using='courier')
-            self.request.flag = 'transit'
-            self.request.save(using='host')
-
-    def post_external(self):
-        self.request.save(using='courier')
-
-    def mirror(self):
-        print('Beginning mirror...')
-
-        args = ['wget', '-e', 'robots=off', '-N', '-nv', 
-                '-r', '-l', '3', '-p', '-t', '3', '-T', 
-                '10', '-4', '-k', '-U', 
-                'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.220 Safari/535', 
-                '--no-cookies', '--ignore-length', '--no-check-certificate', 
-                '--no-remove-listing', '--html-extension', 
-                '-P', self.request.host_store.get_base_path(), self.request.url.with_www()]
-            
-        retcode = subprocess.call(args)
-
-######################################################
-
-request_types = {
-    'HttpRequest': HttpRequest
-}
-
-storage_types = {
-    'UrlStorage': UrlStorage
-}

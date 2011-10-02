@@ -4,19 +4,10 @@ from twisted.web import proxy, http
 from twisted.internet import reactor
 from twisted.internet.protocol import ClientFactory
 from twisted.python import log
-from candice_types import InternalProxy, ExternalProxy, HttpRequest, UrlStorage
-from django.conf import settings
 log.startLogging(sys.stdout)
 
-host_drive = '/home/james/tmpdev/host/'
+execfile('internal_config.py')
 
-databases={
-    'default':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(host_drive, 'CANDICE.db')
-    },
-}
 whitehosts = ['127.0.0.1', 'localhost', '10.2.2.1']
 
 class ProxyRequest(http.Request):
@@ -31,7 +22,7 @@ class ProxyRequest(http.Request):
             self.content.seek(0,0)
             s = self.content.read()
             clientFactory = proxy.ProxyClientFactory(self.method, url, self.clientproto, headers, s, self)
-            self.reactor.connectTCP('localhost', 80, clientFactory)
+            self.reactor.connectTCP(redirect_web_host, redirect_web_port, clientFactory)
             print (url)
         else:
             print (headers['host'])
@@ -47,5 +38,5 @@ class TransparentProxy(http.HTTPChannel):
 class ProxyFactory(http.HTTPFactory):
     protocol = TransparentProxy
 
-reactor.listenTCP(3128, ProxyFactory())
+reactor.listenTCP(redirect_port, ProxyFactory())
 reactor.run()

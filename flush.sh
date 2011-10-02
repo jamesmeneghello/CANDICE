@@ -1,4 +1,4 @@
-rm -rf /home/james/mirror/*
+rm -rf /home/james/mirror/data/*
 rm -rf /home/james/tmpdev/courier/data/*
 rm -rf /home/james/tmpdev/host/data/*
 

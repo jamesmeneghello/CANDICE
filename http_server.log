@@ -1,0 +1,29 @@
+2011-09-27 00:03:49+0800 [-] Log opened.
+2011-09-27 00:03:49+0800 [-] twistd 10.2.0 (/usr/bin/python 2.7.1) starting up.
+2011-09-27 00:03:49+0800 [-] reactor class: twisted.internet.selectreactor.SelectReactor.
+2011-09-27 00:03:49+0800 [-] Traceback (most recent call last):
+2011-09-27 00:03:49+0800 [-]   File "/usr/bin/twistd", line 19, in <module>
+2011-09-27 00:03:49+0800 [-]     run()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/scripts/twistd.py", line 27, in run
+2011-09-27 00:03:49+0800 [-]     app.run(runApp, ServerOptions)
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/application/app.py", line 631, in run
+2011-09-27 00:03:49+0800 [-]     runApp(config)
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/scripts/twistd.py", line 23, in runApp
+2011-09-27 00:03:49+0800 [-]     _SomeApplicationRunner(config).run()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/application/app.py", line 378, in run
+2011-09-27 00:03:49+0800 [-]     self.postApplication()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/scripts/_twistd_unix.py", line 205, in postApplication
+2011-09-27 00:03:49+0800 [-]     self.startApplication(self.application)
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/scripts/_twistd_unix.py", line 308, in startApplication
+2011-09-27 00:03:49+0800 [-]     service.IService(application).privilegedStartService()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/application/service.py", line 272, in privilegedStartService
+2011-09-27 00:03:49+0800 [-]     service.privilegedStartService()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/application/internet.py", line 104, in privilegedStartService
+2011-09-27 00:03:49+0800 [-]     self._port = self._getPort()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/application/internet.py", line 131, in _getPort
+2011-09-27 00:03:49+0800 [-]     'listen%s' % (self.method,))(*self.args, **self.kwargs)
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/internet/posixbase.py", line 419, in listenTCP
+2011-09-27 00:03:49+0800 [-]     p.startListening()
+2011-09-27 00:03:49+0800 [-]   File "/usr/lib/python2.7/dist-packages/twisted/internet/tcp.py", line 857, in startListening
+2011-09-27 00:03:49+0800 [-]     raise CannotListenError, (self.interface, self.port, le)
+2011-09-27 00:03:49+0800 [-] twisted.internet.error.CannotListenError: Couldn't listen on any:80: [Errno 98] Address already in use.

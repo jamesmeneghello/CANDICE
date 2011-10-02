@@ -14,7 +14,7 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
-    url(r'^redirect/(?P<url>.*)', 'candice.handle.views.Redirect'),
-    url(r'^request/(?P<url>.*)', 'candice.handle.views.TakeRequest'),
-    url(r'^(?P<url>.*)', 'candice.handle.views.RequestHandler'),
+    url(r'^redirect/(?P<url>.*)', 'handle.views.Redirect'),
+    url(r'^request/(?P<url>.*)', 'handle.views.TakeRequest'),
+    url(r'^(?P<url>.*)', 'handle.views.RequestHandler'),
 )

@@ -1,34 +1,27 @@
-from candice_types import InternalProxy, ExternalProxy, HttpRequest, UrlStorage
-import os
+from candice_types import ProxyBase
 from django.conf import settings
-from itertools import chain
 
-courier_drive = '/home/james/tmpdev/courier/'
 host_drive = '/home/james/tmpdev/host/'
 
-databases={
-    'default':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(courier_drive, 'Courier.db')
-    },
-    'courier':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(courier_drive, 'Courier.db')
-    },
-    'host':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(host_drive, 'CANDICE.db')
-    },
-}
+class InternalProxy(ProxyBase):
+    def __init__(self):
+        ProxyBase.__init__(self)
+        self.default_db = 'host'
 
-if not databases:
-    raise Exception('No database settings defined in external proxy!')
-settings.configure(DATABASES=databases)
+    def process(self, request):
+        if request.flag == 'requested':
+            self.outgoing(request)
+            request.save(using='courier')
+            request.flag = 'transit'
+            request.save(using='host')
+        elif request.flag == 'retrieved':
+            self.incoming(request)
+            request.flag = 'completed'
+            request.save(using='host')
+            request.delete(using='courier')
 
-from handle.models import Request
-reqs = list(chain(Request.objects.using('host').all(), Request.objects.using('courier').all()))
-proxy = InternalProxy(reqs, host_drive, courier_drive)
-proxy.begin()
+settings.configure()
+proxy = InternalProxy()
+proxy.host_path = host_drive
+print('Listening for usb devices...')
+proxy.start()

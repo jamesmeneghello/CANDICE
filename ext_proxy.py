@@ -1,28 +1,42 @@
-from candice_types import ExternalProxy, HttpRequest, UrlStorage
-import os
+from candice_types import ProxyBase
 from django.conf import settings
+import datetime
 
-courier_drive = '/home/james/tmpdev/courier/'
-host_drive = '/home/james/tmpdev/host/'
+execfile('external_config.py')
 
-databases={
-    'default':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(courier_drive, 'Courier.db')
-    },
-    'courier':
-    {
-            'ENGINE':'django.db.backends.sqlite3',
-            'NAME':os.path.join(courier_drive, 'Courier.db')
-    },
-}
+class ExternalProxy(ProxyBase):
+    def __init__(self):
+        ProxyBase.__init__(self)
+        self.default_db = 'host'
+    
+    def incoming(self, request):
+        ProxyBase.incoming(self, request)
 
-if not databases:
-    raise Exception('No database settings defined in external proxy!')
-settings.configure(DATABASES=databases)
+        try:
+            func = getattr(request.request_handler, request.action)
+        except AttributeError:
+            print('Request called handler action that doesn\'t exist.')
+            sys.exit()
+        else:
+            func()
+            request.action_date = datetime.datetime.now()
 
-from handle.models import Request
-reqs = Request.objects.all()
-proxy = ExternalProxy(reqs, '/home/james/mirror/', courier_drive)
-proxy.begin()
+    def process(self, request):
+        if request.flag == 'retrieved':
+            self.outgoing(request)
+            request.save(using='courier')
+            request.delete(using='host')
+        elif request.flag == 'requested':
+            self.incoming(request)
+            if request.host_store.exists():
+                request.flag = 'retrieved'
+            else:
+                request.flag = 'error'
+            request.save(using='host')
+            request.delete(using='courier')
+
+settings.configure()
+proxy = ExternalProxy()
+proxy.host_path = host_drive
+print('Listening for usb devices...')
+proxy.start()

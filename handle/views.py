@@ -3,16 +3,12 @@
 from django.template import loader, Context
 from django.http import HttpResponse, HttpResponseRedirect
 from models import Request
-from candice.candice_types import URL, UrlStorage
-from pprint import pprint
+from candice_types import URL
 import os
 
-image_media = ['jpg', 'png', 'gif', 'svg']
-script_media = ['css', 'js']
+execfile('internal_config.py')
 
 index_file = 'index.html'
-
-HOST_STORE = '/home/james/tmpdev/host'
 
 def getifip(ifn):
     import socket, fcntl, struct
@@ -23,7 +19,7 @@ def Redirect(request, url):
     u = URL(url)
     u.inject_query(request.GET)
     print (u)
-    return HttpResponseRedirect('http://%s/%s' % (getifip('eth1'), u.__str__().replace('http://', '')))
+    return HttpResponseRedirect('http://%s/%s' % (getifip(web_server_interface), u.__str__().replace('http://', '')))
 
 def RequestHandler(request, url):
     request_url = URL(url)
@@ -31,7 +27,6 @@ def RequestHandler(request, url):
     if robj:
         req = robj[0]
         req.url = request_url
-        host_store = UrlStorage(req, HOST_STORE)
         data = {}
         if req.flag == 'completed':
             data = {'action_date':req.action_date}
@@ -42,15 +37,12 @@ def RequestHandler(request, url):
         return RenderToolbar(request_url.__str__(), 'handle/toolbar_request.inc')
 
 def RenderToolbar(url, template, data = {}):
-    print(url)
-    
-    SERVER_PORT = '8080'
     t = loader.get_template(template)
-    server_addr = 'http://' + getifip('eth1')
+    server_addr = 'http://' + getifip(web_server_interface)
     r = URL(url)
     cd = {
         'url' : server_addr + '/request/' + r.with_www().replace('http://',''),
-        'page': server_addr + ':' + SERVER_PORT + '/' + r.with_www().replace('http://', '')
+        'page': server_addr + ':' + str(content_port) + '/' + r.with_www().replace('http://', '')
     }
     cd.update(data)
     c = Context(cd)
@@ -71,4 +63,4 @@ def TakeRequest(request, url):
 
     r.save()
 
-    return HttpResponseRedirect('http://%s/%s' % (getifip('eth1'), request_url.with_www().replace('http://', '')))
+    return HttpResponseRedirect('http://%s/%s' % (getifip(web_server_interface), request_url.with_www().replace('http://', '')))

@@ -1,5 +1,17 @@
 ===
 
+CANDICE
+
+===
+
+Packages needed (ubuntu/deb):
+
+- udev?, udisks, dbus?
+- python, python-django, python-twisted, python-twisted-web, python-dbus?
+
+
+===
+
 To flush all data:
 
 ./flush.sh
