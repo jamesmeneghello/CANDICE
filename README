@@ -20,6 +20,16 @@ To flush all data:
 
 To run everything from a clean boot:
 
+./start.sh
+
+To stop:
+
+./stop.sh
+
+=====
+
+Manual:
+
 Set firewall rules:
 sudo ./newset.sh
 
